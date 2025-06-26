@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web広告シミュレーションツール</title>
+    <!-- Tailwind CSSを読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- エクスポート機能のためのライブラリを読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* メインカラーのカスタムスタイル */
+        .main-bg-color { background-color: rgb(46, 179, 97); }
+        .main-text-color { color: rgb(46, 179, 97); }
+        .main-border-color { border-color: rgb(46, 179, 97); }
+        /* 入力フィールドの矢印を非表示に */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] { -moz-appearance: textfield; }
+        /* アニメーション */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        /* テーブルの自動調整用スタイル */
+        #result-table-wrapper table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        #result-table-wrapper th {
+            white-space: nowrap; /* 改行を防ぐ */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 12px 8px; /* パディング調整 */
+            vertical-align: middle; /* 上下中央揃え */
+            text-align: center; /* 左右中央揃え */
+        }
+        #result-table-wrapper td {
+            white-space: nowrap; /* 改行を防ぐ */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 12px 8px; /* パディング調整 */
+            vertical-align: middle; /* 上下中央揃え */
+            text-align: right; /* 右揃え */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <header class="main-bg-color shadow-md">
+        <div class="mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-center h-16">
+                <img src="https://chuco-ms.co.jp/wp_cms-new/wp-content/themes/cms-new/assets/img/logo_wt.svg" alt="logo" class="h-8">
+            </div>
+        </div>
+    </header>
+
+    <div class="mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-white">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold main-text-color">Web広告シミュレーションツール</h1>
+            <p class="text-gray-600 mt-2">広告のパフォーマンスを予測し、戦略立案をサポートします。</p>
+        </header>
+
+        <main>
+            <!-- 入力セクション -->
+            <div class="max-w-7xl mx-auto">
+                 <div class="space-y-6 bg-gray-50 p-6 shadow-sm mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800 border-l-4 main-border-color pl-3 mb-4">基本設定</h2>
+                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="ad-medium" class="block text-sm font-medium text-gray-700 mb-1">広告媒体</label>
+                                    <select id="ad-medium" class="w-full p-2 border border-gray-300 focus:ring-1 focus:main-border-color focus:border-transparent">
+                                        <option>Meta</option>
+                                        <option>Googleリスティング</option>
+                                        <option>Yahooリスティング</option>
+                                        <option>Googleディスプレイ</option>
+                                        <option>Yahooディスプレイ</option>
+                                        <option>LINE</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="bidding-strategy" class="block text-sm font-medium text-gray-700 mb-1">入札戦略</label>
+                                    <select id="bidding-strategy" class="w-full p-2 border border-gray-300 focus:ring-1 focus:main-border-color focus:border-transparent">
+                                        <option value="cv">CV</option>
+                                        <option value="traffic">流入</option>
+                                        <option value="awareness">認知</option>
+                                    </select>
+                                </div>
+                             </div>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800 border-l-4 main-border-color pl-3 mb-4">ターゲット情報 (任意)</h2>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <input type="text" id="target-region" placeholder="地域" class="p-2 border border-gray-300">
+                                <input type="text" id="target-age" placeholder="年齢" class="p-2 border border-gray-300">
+                                <input type="text" id="target-gender" placeholder="性別" class="p-2 border border-gray-300">
+                                <input type="text" id="target-interest" placeholder="興味関心" class="p-2 border border-gray-300">
+                                <input type="text" id="target-demographics" placeholder="利用者層" class="p-2 border border-gray-300">
+                                <input type="text" id="target-industry" placeholder="業種" class="p-2 border border-gray-300">
+                                <input type="text" id="target-size" placeholder="推定サイズ" class="p-2 border border-gray-300">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6 bg-gray-50 p-6 shadow-sm">
+                        <h2 class="text-xl font-bold text-gray-800 border-l-4 main-border-color pl-3">予算とパフォーマンス指標</h2>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">パフォーマンス指標の設定方法</label>
+                            <div id="perf-setting-radios" class="flex items-center space-x-4">
+                                <label class="flex items-center"><input type="radio" name="perf-setting" value="common" checked class="h-4 w-4 main-text-color focus:ring-green-400 border-gray-300"> <span class="ml-2 text-sm">全て共通の指標を使用</span></label>
+                                <label class="flex items-center"><input type="radio" name="perf-setting" value="individual" class="h-4 w-4 main-text-color focus:ring-green-400 border-gray-300"> <span class="ml-2 text-sm">予算別に設定</span></label>
+                            </div>
+                        </div>
+                        
+                        <!-- 共通のパフォーマンス指標 -->
+                        <div id="common-perf-indicators" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div id="cpm-input-wrapper-common">
+                                <label class="block text-sm font-medium text-gray-700">表示単価</label>
+                                <div class="flex items-center space-x-2"><input type="number" data-metric="cpm-min" class="common-perf-input w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpm-max" class="common-perf-input w-full p-2 border border-gray-300"></div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">クリック率 (%)</label>
+                                <div class="flex items-center space-x-2"><input type="number" data-metric="ctr-min" class="common-perf-input w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="ctr-max" class="common-perf-input w-full p-2 border border-gray-300"></div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">クリック単価 (¥)</label>
+                                <div class="flex items-center space-x-2"><input type="number" data-metric="cpc-min" class="common-perf-input w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpc-max" class="common-perf-input w-full p-2 border border-gray-300"></div>
+                            </div>
+                             <div id="cvr-input-wrapper-common">
+                                <label class="block text-sm font-medium text-gray-700">コンバージョン率 (%)</label>
+                                <div class="flex items-center space-x-2"><input type="number" data-metric="cvr-min" class="common-perf-input w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cvr-max" class="common-perf-input w-full p-2 border border-gray-300"></div>
+                            </div>
+                             <div id="cpa-input-wrapper-common">
+                                <label class="block text-sm font-medium text-gray-700">コンバージョン単価 (¥)</label>
+                                <div class="flex items-center space-x-2"><input type="number" data-metric="cpa-min" class="common-perf-input w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpa-max" class="common-perf-input w-full p-2 border border-gray-300"></div>
+                            </div>
+                        </div>
+
+                        <!-- 予算別の設定エリア -->
+                        <div id="budget-container" class="space-y-6">
+                            <!-- 予算入力欄がここに追加されます -->
+                        </div>
+                        <button id="add-budget-btn" class="mt-2 text-sm main-text-color font-semibold hover:underline">+ 予算パターンを追加</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 実行ボタン -->
+            <div class="text-center mb-8">
+                <button id="simulate-btn" class="main-bg-color text-white font-bold py-3 px-12 shadow-lg hover:opacity-90 transition-opacity transform hover:scale-105">
+                    シミュレーション作成
+                </button>
+            </div>
+
+            <!-- 結果表示セクション -->
+            <div id="result-section" class="hidden">
+                <hr class="my-8">
+                <!-- VVVVVVVV この内側がエクスポート対象 VVVVVVVV -->
+                <div id="export-content-area" class="pb-8 px-4">
+                    <div class="flex items-baseline space-x-4 mb-4">
+                         <h2 class="text-2xl font-bold main-text-color">シミュレーション結果</h2>
+                         <p id="result-header-info" class="text-gray-600 font-bold"></p>
+                    </div>
+                    <div id="target-display-wrapper" class="mb-6 bg-green-50 main-border-color border p-4 shadow-sm hidden">
+                        <h3 class="font-bold text-gray-700 mb-2">ターゲット設定</h3>
+                        <div id="target-display" class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600"></div>
+                    </div>
+                    <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 relative mb-6" role="alert"></div>
+                    <div id="result-table-wrapper" class="overflow-x-auto border border-gray-200">
+                        <table id="result-table" class="min-w-full bg-white">
+                            <thead class="main-bg-color text-white">
+                                <tr>
+                                    <th id="res-header-budget" class="border-r border-green-400">予算</th>
+                                    <th id="res-header-imp" class="border-r border-green-400">表示回数</th>
+                                    <th id="res-header-cpm" class="border-r border-green-400">表示単価<br><span class="text-xs font-normal">※1000回表示</span></th>
+                                    <th id="res-header-clicks" class="border-r border-green-400">クリック数</th>
+                                    <th id="res-header-ctr" class="border-r border-green-400">クリック率</th>
+                                    <th id="res-header-cpc" class="border-r border-green-400">クリック単価</th>
+                                    <th id="res-header-cv" class="border-r border-green-400">コンバージョン数</th>
+                                    <th id="res-header-cvr" class="border-r border-green-400">コンバージョン率</th>
+                                    <th id="res-header-cpa">コンバージョン単価</th>
+                                </tr>
+                            </thead>
+                            <tbody id="result-body" class="text-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="notes-section" class="mt-8 text-xs text-gray-500 space-y-1">
+                        <p>（※） 月額広告予算の中にバナー制作費用や弊社広告運用手数料が含まれております。</p>
+                        <p>（※） 上記はあくまで媒体の参考数値をベースにしたシミュレーションのため、広告の成果を保証するものではありません。</p>
+                        <p>（※） 広告配信にかかる単価は広告の出稿時期や、配信期間中の他社の出稿量によっても数値に変動が発生します。</p>
+                        <p id="note-cv-strategy" class="hidden">（※） 目標達成のために初動の1～3ヶ月はデータ収集と改善がメインになります。</p>
+                        <p>（※） 関数を用いて算出し、小数点を含む結果になります。</p>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-center space-x-4">
+                     <h3 class="text-lg font-bold text-gray-800 mb-4">エクスポート</h3>
+                    <button id="export-png-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">画像 (PNG)</button>
+                    <button id="export-pdf-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">PDF</button>
+                    <button id="export-excel-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">Excel (XLSX)</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- DOM要素 ---
+    const adMediumEl = document.getElementById('ad-medium');
+    const biddingStrategyEl = document.getElementById('bidding-strategy');
+    const simulateBtn = document.getElementById('simulate-btn');
+    const resultSection = document.getElementById('result-section');
+    const errorMessageEl = document.getElementById('error-message');
+    const resultTableWrapper = document.getElementById('result-table-wrapper');
+    const resultTable = document.getElementById('result-table');
+    const resultBody = document.getElementById('result-body');
+    const noteCvStrategy = document.getElementById('note-cv-strategy');
+    const budgetContainer = document.getElementById('budget-container');
+    const addBudgetBtn = document.getElementById('add-budget-btn');
+    const perfSettingRadios = document.getElementById('perf-setting-radios');
+    const commonPerfIndicators = document.getElementById('common-perf-indicators');
+    const resultHeaderInfo = document.getElementById('result-header-info');
+
+    // --- 初期設定とイベントリスナー ---
+    const init = () => {
+        addBudgetInput(); 
+        togglePerfSettingView();
+        toggleColumnVisibility();
+        adMediumEl.addEventListener('change', toggleColumnVisibility);
+        biddingStrategyEl.addEventListener('change', toggleColumnVisibility);
+        addBudgetBtn.addEventListener('click', addBudgetInput);
+        budgetContainer.addEventListener('click', handleBudgetContainerClick);
+        simulateBtn.addEventListener('click', runSimulation);
+        perfSettingRadios.addEventListener('change', togglePerfSettingView);
+        document.getElementById('export-png-btn').addEventListener('click', exportAsPng);
+        document.getElementById('export-pdf-btn').addEventListener('click', exportAsPdf);
+        document.getElementById('export-excel-btn').addEventListener('click', exportAsXlsx);
+        window.addEventListener('resize', adjustTableLayout);
+    };
+    
+    // --- パフォーマンス設定の表示切替 ---
+    function togglePerfSettingView() {
+        const setting = document.querySelector('input[name="perf-setting"]:checked').value;
+        if (setting === 'common') {
+            commonPerfIndicators.style.display = 'grid';
+            document.querySelectorAll('.individual-perf-indicators').forEach(el => {
+                el.style.display = 'none';
+            });
+        } else {
+            commonPerfIndicators.style.display = 'none';
+             document.querySelectorAll('.individual-perf-indicators').forEach(el => {
+                el.style.display = 'grid';
+            });
+        }
+        toggleColumnVisibility();
+    }
+    
+    // --- 予算入力欄の動的追加・削除 ---
+    function addBudgetInput() {
+        const budgetRow = document.createElement('div');
+        budgetRow.className = 'budget-row p-4 border border-gray-200';
+
+        const budgetInputHtml = `
+            <div class="flex items-center justify-between mb-4">
+                 <label class="block text-sm font-medium text-gray-700">予算 (¥)</label>
+                 <button type="button" class="remove-budget-btn text-red-500 hover:text-red-700 font-bold">✕ 削除</button>
+            </div>
+            <input type="number" class="budget-input w-full p-2 border border-gray-300" placeholder="例: 500000">
+        `;
+        
+        const individualPerfHtml = `
+            <div class="individual-perf-indicators grid-cols-1 md:grid-cols-2 gap-4 mt-4" style="display: none;">
+                 <div class="cpm-input-wrapper-individual">
+                    <label class="block text-sm font-medium text-gray-700">表示単価</label>
+                    <div class="flex items-center space-x-2"><input type="number" data-metric="cpm-min" class="w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpm-max" class="w-full p-2 border border-gray-300"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">クリック率 (%)</label>
+                    <div class="flex items-center space-x-2"><input type="number" data-metric="ctr-min" class="w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="ctr-max" class="w-full p-2 border border-gray-300"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">クリック単価 (¥)</label>
+                    <div class="flex items-center space-x-2"><input type="number" data-metric="cpc-min" class="w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpc-max" class="w-full p-2 border border-gray-300"></div>
+                </div>
+                 <div class="cvr-input-wrapper-individual">
+                    <label class="block text-sm font-medium text-gray-700">コンバージョン率 (%)</label>
+                    <div class="flex items-center space-x-2"><input type="number" data-metric="cvr-min" class="w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cvr-max" class="w-full p-2 border border-gray-300"></div>
+                </div>
+                 <div class="cpa-input-wrapper-individual">
+                    <label class="block text-sm font-medium text-gray-700">コンバージョン単価 (¥)</label>
+                    <div class="flex items-center space-x-2"><input type="number" data-metric="cpa-min" class="w-full p-2 border border-gray-300"><span class="text-gray-500">～</span><input type="number" data-metric="cpa-max" class="w-full p-2 border border-gray-300"></div>
+                </div>
+            </div>
+        `;
+        
+        budgetRow.innerHTML = budgetInputHtml + individualPerfHtml;
+        budgetContainer.appendChild(budgetRow);
+        togglePerfSettingView(); // 新しい行の表示を現在の設定に合わせる
+    }
+    
+    function handleBudgetContainerClick(e) {
+        if (e.target.classList.contains('remove-budget-btn')) {
+            if (budgetContainer.children.length > 1) {
+                e.target.closest('.budget-row').remove();
+            }
+        }
+    }
+
+    // --- UI表示切り替え ---
+    function toggleColumnVisibility() {
+        const isMeta = adMediumEl.value === 'Meta';
+        const isCvStrategy = biddingStrategyEl.value === 'cv';
+        const perfSetting = document.querySelector('input[name="perf-setting"]:checked').value;
+
+        // 共通指標の表示切替
+        document.getElementById('cpm-input-wrapper-common').style.display = isMeta ? 'block' : 'none';
+        document.getElementById('cvr-input-wrapper-common').style.display = isCvStrategy ? 'block' : 'none';
+        document.getElementById('cpa-input-wrapper-common').style.display = isCvStrategy ? 'block' : 'none';
+        
+        // 個別指標の表示切替
+        document.querySelectorAll('.cpm-input-wrapper-individual').forEach(el => el.style.display = isMeta ? 'block' : 'none');
+        document.querySelectorAll('.cvr-input-wrapper-individual').forEach(el => el.style.display = isCvStrategy ? 'block' : 'none');
+        document.querySelectorAll('.cpa-input-wrapper-individual').forEach(el => el.style.display = isCvStrategy ? 'block' : 'none');
+        
+        // 結果テーブルの列表示切替
+        document.getElementById('res-header-cpm').style.display = isMeta ? 'table-cell' : 'none';
+        const cvHeaderIds = ['res-header-cv', 'res-header-cvr', 'res-header-cpa'];
+        cvHeaderIds.forEach(id => document.getElementById(id).style.display = isCvStrategy ? 'table-cell' : 'none');
+        document.getElementById('note-cv-strategy').style.display = isCvStrategy ? 'block' : 'none';
+
+        // 既存の行のセル表示を更新
+        resultBody.querySelectorAll('tr').forEach(row => {
+            row.querySelector('[id^="res-cpm-"]').style.display = isMeta ? 'table-cell' : 'none';
+            row.querySelector('[id^="res-cv-"]').style.display = isCvStrategy ? 'table-cell' : 'none';
+            row.querySelector('[id^="res-cvr-"]').style.display = isCvStrategy ? 'table-cell' : 'none';
+            row.querySelector('[id^="res-cpa-"]').style.display = isCvStrategy ? 'table-cell' : 'none';
+        });
+
+        adjustTableLayout();
+    }
+
+
+    // --- 数値取得・整形 ---
+    function getPerfInputs(container) {
+        const getVal = (metric) => {
+            const el = container.querySelector(`[data-metric="${metric}"]`);
+            return el && el.value ? parseFloat(el.value) : null;
+        };
+        const ctrMin = getVal('ctr-min') ? getVal('ctr-min') / 100 : null;
+        const cvrMin = getVal('cvr-min') ? getVal('cvr-min') / 100 : null;
+
+        return {
+            cpmMin: getVal('cpm-min'), cpmMax: getVal('cpm-max') || getVal('cpm-min'),
+            ctrMin: ctrMin, ctrMax: getVal('ctr-max') ? getVal('ctr-max') / 100 : ctrMin,
+            cpcMin: getVal('cpc-min'), cpcMax: getVal('cpc-max') || getVal('cpc-min'),
+            cvrMin: cvrMin, cvrMax: getVal('cvr-max') ? getVal('cvr-max') / 100 : cvrMin,
+            cpaMin: getVal('cpa-min'), cpaMax: getVal('cpa-max') || getVal('cpa-min'),
+        };
+    }
+
+    function formatSingleResult(value, unit = '') {
+        if (value === null || typeof value === 'undefined' || isNaN(value)) return '-';
+        const formattedValue = Math.floor(value).toLocaleString();
+        return unit === '¥' ? `${unit}${formattedValue}` : `${formattedValue}${unit}`;
+    }
+
+    function formatRangeResult(min, max, unit = '', isPercentage = false) {
+        const format = (val) => {
+            if (val === null || typeof val === 'undefined' || isNaN(val)) return '-';
+            if (isPercentage) {
+                let percentageValue = val * 100;
+                percentageValue = parseFloat(percentageValue.toPrecision(15));
+                if (percentageValue % 1 === 0) return percentageValue.toFixed(1);
+                return percentageValue.toString();
+            }
+            return Math.floor(val).toLocaleString();
+        };
+        const minStr = format(min);
+        const maxStr = format(max);
+
+        if (minStr === '-' && maxStr === '-') return '-';
+        if (minStr === maxStr) {
+             if (unit === '¥') return `${unit}${minStr}`;
+             return `${minStr}${unit}`;
+        }
+        
+        if (unit === '¥') {
+            return `${unit}${minStr}～${unit}${maxStr}`;
+        } else { // Handles unitless and percentages (suffix)
+            return `${minStr}～${maxStr}${unit}`;
+        }
+    }
+    
+    // --- シミュレーション実行 ---
+    function runSimulation() {
+        resultSection.style.display = 'block';
+        resultSection.classList.add('fade-in');
+        errorMessageEl.style.display = 'none';
+        resultTableWrapper.style.display = 'block';
+        resultBody.innerHTML = ''; 
+        
+        const adMediumText = adMediumEl.options[adMediumEl.selectedIndex].text;
+        resultHeaderInfo.textContent = `広告媒体：${adMediumText}`;
+
+        const perfSetting = document.querySelector('input[name="perf-setting"]:checked').value;
+        const commonInputs = perfSetting === 'common' ? getPerfInputs(commonPerfIndicators) : null;
+        
+        const budgetRows = Array.from(document.querySelectorAll('.budget-row'));
+        if (budgetRows.every(row => !row.querySelector('.budget-input').value)) {
+            showError('有効な予算を入力してください。');
+            return;
+        }
+        
+        let hasError = false;
+        budgetRows.forEach(row => {
+            if (hasError) return;
+            const budget = parseFloat(row.querySelector('.budget-input').value);
+            if (!budget || isNaN(budget)) return;
+
+            const perfInputs = perfSetting === 'individual' ? getPerfInputs(row) : commonInputs;
+
+            const minScenarioInputs = { budget, cpm: perfInputs.cpmMax, ctr: perfInputs.ctrMin, cpc: perfInputs.cpcMax, cvr: perfInputs.cvrMin, cpa: perfInputs.cpaMax };
+            const maxScenarioInputs = { budget, cpm: perfInputs.cpmMin, ctr: perfInputs.ctrMax, cpc: perfInputs.cpcMin, cvr: perfInputs.cvrMax, cpa: perfInputs.cpaMin };
+            
+            const minResults = calculateMetrics(minScenarioInputs);
+            const maxResults = calculateMetrics(maxScenarioInputs);
+
+            if (minResults.error || maxResults.error) {
+                showError(minResults.error || maxResults.error);
+                hasError = true;
+                return;
+            }
+            appendResultRow(minResults, maxResults);
+        });
+
+        if (!hasError) {
+            displayTargetInfo();
+            toggleColumnVisibility(); 
+        }
+    }
+    
+    // --- 結果行の追加 ---
+    function appendResultRow(min, max) {
+        const row = resultBody.insertRow();
+        row.className = 'border-b border-gray-200';
+
+        row.innerHTML = `
+            <td id="res-budget-${min.budget}">${formatSingleResult(min.budget, '¥')}</td>
+            <td id="res-imp-${min.budget}">${formatRangeResult(min.imp, max.imp)}</td>
+            <td id="res-cpm-${min.budget}">${formatRangeResult(max.cpm, min.cpm, '¥')}</td>
+            <td id="res-clicks-${min.budget}">${formatRangeResult(min.clicks, max.clicks)}</td>
+            <td id="res-ctr-${min.budget}">${formatRangeResult(min.ctr, max.ctr, '%', true)}</td>
+            <td id="res-cpc-${min.budget}">${formatRangeResult(max.cpc, min.cpc, '¥')}</td>
+            <td id="res-cv-${min.budget}">${formatRangeResult(min.cv, max.cv)}</td>
+            <td id="res-cvr-${min.budget}">${formatRangeResult(min.cvr, max.cvr, '%', true)}</td>
+            <td id="res-cpa-${min.budget}">${formatRangeResult(max.cpa, min.cpa, '¥')}</td>
+        `;
+        Array.from(row.children).forEach(cell => cell.classList.add('border-r', 'border-gray-200'));
+        row.lastElementChild.classList.remove('border-r');
+    }
+
+    // --- コア計算ロジック (変更なし) ---
+    function calculateMetrics(inputs) {
+        let metrics = { budget: inputs.budget || null, imp: null, cpm: inputs.cpm || null, clicks: null, ctr: inputs.ctr || null, cpc: inputs.cpc || null, cv: null, cvr: inputs.cvr || null, cpa: inputs.cpa || null };
+        for (let i = 0; i < 5; i++) {
+            if (metrics.clicks === null && metrics.budget && metrics.cpc) metrics.clicks = metrics.budget / metrics.cpc;
+            else if (metrics.clicks === null && metrics.imp && metrics.ctr) metrics.clicks = metrics.imp * metrics.ctr;
+            else if (metrics.clicks === null && metrics.cv && metrics.cvr && metrics.cvr > 0) metrics.clicks = metrics.cv / metrics.cvr;
+            if (metrics.imp === null && adMediumEl.value === 'Meta' && metrics.budget && metrics.cpm) metrics.imp = (metrics.budget / metrics.cpm) * 1000;
+            else if (metrics.imp === null && metrics.clicks && metrics.ctr && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
+            if (biddingStrategyEl.value === 'cv') {
+                 if (metrics.cv === null && metrics.budget && metrics.cpa) metrics.cv = metrics.budget / metrics.cpa;
+                 else if (metrics.cv === null && metrics.clicks && metrics.cvr) metrics.cv = metrics.clicks * metrics.cvr;
+            }
+            if (metrics.budget && metrics.clicks > 0) metrics.cpc = metrics.budget / metrics.clicks;
+            if (metrics.clicks && metrics.imp > 0) metrics.ctr = metrics.clicks / metrics.imp;
+            if (adMediumEl.value === 'Meta' && metrics.budget && metrics.imp > 0) metrics.cpm = (metrics.budget / metrics.imp) * 1000;
+            if (biddingStrategyEl.value === 'cv') {
+                if (metrics.budget && metrics.cv > 0) metrics.cpa = metrics.budget / metrics.cv;
+                if (metrics.cv && metrics.clicks > 0) metrics.cvr = metrics.cv / metrics.clicks;
+            }
+        }
+        if (metrics.clicks === null && metrics.imp === null) return { error: '表示回数やクリック数を算出するための情報が不足しています。CPC、CTR、CPM（Metaの場合）のいずれかを入力してください。' };
+        if (metrics.clicks === null && metrics.imp && metrics.ctr !== null) metrics.clicks = metrics.imp * metrics.ctr;
+        if (metrics.imp === null && metrics.clicks && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
+        if (biddingStrategyEl.value === 'cv' && metrics.cv === null) return { error: 'コンバージョン数を算出するための情報が不足しています。CPAまたはCVRを入力してください。' };
+        return metrics;
+    }
+
+    // --- レイアウト調整とエラー表示 ---
+    function adjustTableLayout() {
+        if (!resultTableWrapper || !resultTable) return;
+        resultTable.style.fontSize = ''; 
+        const containerWidth = resultTableWrapper.clientWidth;
+        let fontSize = 16;
+        const minFontSize = 10;
+        requestAnimationFrame(() => {
+            if (resultTable.scrollWidth > containerWidth) {
+                while(resultTable.scrollWidth > containerWidth && fontSize > minFontSize) {
+                    fontSize -= 0.5;
+                    resultTable.style.fontSize = `${fontSize}px`;
+                }
+            } else {
+                 resultTable.style.fontSize = '1rem';
+            }
+        });
+    }
+    
+    function showError(message) {
+        errorMessageEl.textContent = message;
+        errorMessageEl.style.display = 'block';
+        resultTableWrapper.style.display = 'none';
+        document.getElementById('target-display-wrapper').style.display = 'none';
+    }
+
+    function displayTargetInfo() {
+        const targetDisplay = document.getElementById('target-display');
+        const wrapper = document.getElementById('target-display-wrapper');
+        targetDisplay.innerHTML = '';
+        const targets = [ { label: '地域', value: document.getElementById('target-region').value }, { label: '年齢', value: document.getElementById('target-age').value }, { label: '性別', value: document.getElementById('target-gender').value }, { label: '興味関心', value: document.getElementById('target-interest').value }, { label: '利用者層', value: document.getElementById('target-demographics').value }, { label: '業種', value: document.getElementById('target-industry').value }, { label: '推定サイズ', value: document.getElementById('target-size').value }, ];
+        let hasContent = false;
+        targets.forEach(t => {
+            if (t.value.trim() !== '') {
+                const el = document.createElement('span');
+                el.innerHTML = `<strong class="font-semibold">${t.label}:</strong> ${t.value}`;
+                targetDisplay.appendChild(el);
+                hasContent = true;
+            }
+        });
+        wrapper.style.display = hasContent ? 'block' : 'none';
+    }
+
+    // --- エクスポート関数 ---
+    function exportAsPng() { 
+        html2canvas(document.getElementById('export-content-area'), { scale: 2 }).then(canvas => { 
+            const link = document.createElement('a'); 
+            link.download = 'simulation-result.png'; 
+            link.href = canvas.toDataURL('image/png'); 
+            link.click(); 
+        }); 
+    }
+
+    function exportAsPdf() { 
+        const { jsPDF } = window.jspdf; 
+        html2canvas(document.getElementById('export-content-area'), { scale: 2 }).then(canvas => { 
+            const imgData = canvas.toDataURL('image/png'); 
+            const pdf = new jsPDF('l', 'mm', 'a4'); 
+            const imgProps = pdf.getImageProperties(imgData); 
+            const pdfWidth = pdf.internal.pageSize.getWidth(); 
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width; 
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight); 
+            pdf.save('simulation-result.pdf'); 
+        }); 
+    }
+
+    function exportAsXlsx() {
+        const exportArea = document.getElementById('export-content-area');
+        const data = [];
+        let tableStartRow = 0;
+        
+        const title = exportArea.querySelector('h2').innerText;
+        const subTitle = exportArea.querySelector('#result-header-info').innerText;
+        data.push([`${title}  ${subTitle}`]);
+        data.push([]); 
+        tableStartRow += 2;
+
+        const targetWrapper = exportArea.querySelector('#target-display-wrapper');
+        if (targetWrapper.style.display !== 'none') {
+            const targetItems = [];
+            targetWrapper.querySelectorAll('#target-display span').forEach(span => targetItems.push(span.innerText));
+            data.push(['ターゲット設定:']);
+            data.push(targetItems);
+            data.push([]); 
+            tableStartRow += 3;
+        }
+        const tableHeaders = [];
+        const visibleCols = [];
+        exportArea.querySelectorAll('#result-table thead th').forEach((th, index) => {
+            if (th.style.display !== 'none') {
+                tableHeaders.push(th.innerText.replace(/\n/g, ' '));
+                visibleCols.push(index);
+            }
+        });
+        data.push(tableHeaders);
+        const tableBody = [];
+        exportArea.querySelectorAll('#result-table tbody tr').forEach(tr => {
+            const rowData = [];
+            tr.querySelectorAll('td').forEach((td, index) => {
+                if (visibleCols.includes(index)) rowData.push(td.innerText);
+            });
+            tableBody.push(rowData);
+        });
+        data.push(...tableBody);
+        const tableEndRow = tableStartRow + tableBody.length;
+        data.push([]); 
+        let notesStartRow = tableEndRow + 2;
+        data.push(['注釈:']);
+        exportArea.querySelectorAll('#notes-section p').forEach(p => {
+             if (p.style.display !== 'none') data.push([p.innerText]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const font = { name: '游ゴシック', sz: 11 };
+        const border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+        const titleStyle = { font: { ...font, sz: 16, bold: true, color: { rgb: "2EB361"} }, alignment: { horizontal: "left" } };
+        const sectionHeaderStyle = { font: { ...font, bold: true } };
+        const tableHeaderStyle = { font: { ...font, bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2EB361" } }, alignment: { horizontal: "center", vertical: "center" }, border: border };
+        const tableCellStyle = { font, border, alignment: { horizontal: "right", vertical: "center" } };
+        if(ws['A1']) ws['A1'].s = titleStyle;
+        if (targetWrapper.style.display !== 'none' && ws['A3']) ws['A3'].s = sectionHeaderStyle;
+        if(ws[`A${notesStartRow}`]) ws[`A${notesStartRow}`].s = sectionHeaderStyle;
+        for(let C = 0; C < tableHeaders.length; ++C) {
+            const headerCellAddress = XLSX.utils.encode_cell({r: tableStartRow, c: C});
+            if (ws[headerCellAddress]) ws[headerCellAddress].s = tableHeaderStyle;
+            for(let R = tableStartRow + 1; R <= tableEndRow; ++R) {
+                 const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+                 if (ws[cellAddress]) ws[cellAddress].s = tableCellStyle;
+            }
+        }
+        const colWidths = tableHeaders.map(header => ({ wch: header.length > 15 ? header.length : 15 }));
+        ws['!cols'] = colWidths;
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'シミュレーション結果');
+        XLSX.writeFile(wb, 'simulation-result.xlsx');
+    }
+
+    // --- 初期化 ---
+    init();
+});
+</script>
+
+</body>
+</html>
