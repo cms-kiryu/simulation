@@ -364,25 +364,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const perfInputs = perfSetting === 'individual' ? getPerfInputs(row) : commonInputs;
                 
-                const baseMinInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMax, ctr: perfInputs.ctrMin, cpc: perfInputs.cpcMax, cvr: perfInputs.cvrMin, cpa: perfInputs.cpaMax };
-                const baseMaxInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMin, ctr: perfInputs.ctrMax, cpc: perfInputs.cpcMin, cvr: perfInputs.cvrMax, cpa: perfInputs.cpaMin };
+                const minInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMax, ctr: perfInputs.ctrMin, cpc: perfInputs.cpcMax, cvr: perfInputs.cvrMin, cpa: perfInputs.cpaMax };
+                const maxInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMin, ctr: perfInputs.ctrMax, cpc: perfInputs.cpcMin, cvr: perfInputs.cvrMax, cpa: perfInputs.cpaMin };
                 
-                const baseMinResults = calculateMetrics(baseMinInputs);
-                const baseMaxResults = calculateMetrics(baseMaxInputs);
+                let minResults = calculateMetrics(minInputs);
+                let maxResults = calculateMetrics(maxInputs);
 
-                if (baseMinResults.error || baseMaxResults.error) {
-                    showError(resultBlock, `[${adMediumText}] ${baseMinResults.error || baseMaxResults.error}`);
+                if (minResults.error || maxResults.error) {
+                    showError(resultBlock, `[${adMediumText}] ${minResults.error || maxResults.error}`);
                     hasError = true;
                     return;
                 }
 
-                if (adMediumText !== 'Meta') {
-                    const impMinInputs = { ...baseMinInputs, ctr: perfInputs.ctrMax };
-                    const impMaxInputs = { ...baseMaxInputs, ctr: perfInputs.ctrMin };
-                    const impMinResults = calculateMetrics(impMinInputs);
-                    const impMaxResults = calculateMetrics(impMaxInputs);
-                    baseMinResults.imp = impMinResults.imp;
-                    baseMaxResults.imp = impMaxResults.imp;
+                // 【修正】手動入力でない場合のみ、率の範囲を再計算
+                if (perfInputs.ctrMin === null) {
+                    minResults.ctr = minResults.clicks / maxResults.imp;
+                    maxResults.ctr = maxResults.clicks / minResults.imp;
+                }
+                
+                const isCvStrategy = mediaBlock.querySelector('.bidding-strategy').value === 'cv';
+                if(isCvStrategy && perfInputs.cvrMin === null) {
+                    minResults.cvr = minResults.cv / maxResults.clicks;
+                    maxResults.cvr = maxResults.cv / minResults.clicks;
                 }
                 
                 if (!allResultsByPattern[index]) {
@@ -391,11 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 allResultsByPattern[index].push({
                     isMeta: adMediumText === 'Meta',
                     isCvStrategy: mediaBlock.querySelector('.bidding-strategy').value === 'cv',
-                    min: baseMinResults,
-                    max: baseMaxResults
+                    min: minResults,
+                    max: maxResults
                 });
 
-                appendResultRow(resultBody, baseMinResults, baseMaxResults);
+                appendResultRow(resultBody, minResults, maxResults);
             });
 
             if (!hasError) {
@@ -493,16 +496,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const finalMin = { budget: totals.min.budget, imp: totals.min.imp, clicks: totals.min.clicks, cv: totals.min.cv };
             const finalMax = { budget: totals.max.budget, imp: totals.max.imp, clicks: totals.max.clicks, cv: totals.max.cv };
             
-            finalMin.ctr = finalMin.clicks / finalMin.imp;
-            finalMax.ctr = finalMax.clicks / finalMax.imp;
-            finalMin.cpc = finalMin.budget / finalMin.clicks;
-            finalMax.cpc = finalMax.budget / finalMax.clicks;
+            finalMin.ctr = finalMin.clicks / finalMax.imp;
+            finalMax.ctr = finalMax.clicks / finalMin.imp;
+            finalMin.cpc = finalMin.budget / finalMax.clicks;
+            finalMax.cpc = finalMax.budget / finalMin.clicks;
             finalMin.cpm = null;
             finalMax.cpm = null;
-            finalMin.cvr = finalMin.cv / finalMin.clicks;
-            finalMax.cvr = finalMax.cv / finalMax.clicks;
-            finalMin.cpa = finalMin.budget / finalMin.cv;
-            finalMax.cpa = finalMax.budget / finalMax.cv;
+            finalMin.cvr = finalMin.cv / finalMax.clicks;
+            finalMax.cvr = finalMax.cv / finalMin.clicks;
+            finalMin.cpa = finalMin.budget / finalMax.cv;
+            finalMax.cpa = finalMax.budget / finalMin.cv;
 
             appendResultRow(totalResultBody, finalMin, finalMax);
         }
@@ -556,13 +559,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedValue = Math.round(value).toLocaleString();
         return unit === '¥' ? `${unit}${formattedValue}` : `${formattedValue}${unit}`;
     }
-    // 【修正】パーセンテージのフォーマットロジックを修正
+
     function formatRangeResult(min, max, unit = '', isPercentage = false) {
         const format = (val) => {
             if (val === null || typeof val === 'undefined' || isNaN(val) || !isFinite(val)) return '-';
             if (isPercentage) {
                 const percentageValue = val * 100;
-                return percentageValue.toFixed(1); // 常に小数点第一位で丸める
+                return percentageValue.toFixed(1);
             }
             return Math.round(val).toLocaleString();
         };
@@ -583,26 +586,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function calculateMetrics(inputs) {
         let metrics = { budget: inputs.budget, imp: null, cpm: inputs.cpm, clicks: null, ctr: inputs.ctr, cpc: inputs.cpc, cv: null, cvr: inputs.cvr, cpa: inputs.cpa };
         for (let i = 0; i < 5; i++) {
-            if (metrics.clicks === null && metrics.budget && metrics.cpc) metrics.clicks = metrics.budget / metrics.cpc;
-            else if (metrics.clicks === null && metrics.imp && metrics.ctr) metrics.clicks = metrics.imp * metrics.ctr;
-            else if (metrics.clicks === null && metrics.cv && metrics.cvr && metrics.cvr > 0) metrics.clicks = metrics.cv / metrics.cvr;
-            if (metrics.imp === null && inputs.adMedium === 'Meta' && metrics.budget && metrics.cpm) metrics.imp = (metrics.budget / metrics.cpm) * 1000;
-            else if (metrics.imp === null && metrics.clicks && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
+            if (metrics.clicks === null && metrics.budget !== null && metrics.cpc !== null) metrics.clicks = metrics.budget / metrics.cpc;
+            else if (metrics.clicks === null && metrics.imp !== null && metrics.ctr !== null) metrics.clicks = metrics.imp * metrics.ctr;
+            else if (metrics.clicks === null && metrics.cv !== null && metrics.cvr !== null && metrics.cvr > 0) metrics.clicks = metrics.cv / metrics.cvr;
+            
+            if (metrics.imp === null && inputs.adMedium === 'Meta' && metrics.budget !== null && metrics.cpm !== null) metrics.imp = (metrics.budget / metrics.cpm) * 1000;
+            else if (metrics.imp === null && metrics.clicks !== null && metrics.ctr !== null && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
+            
             if (inputs.biddingStrategy === 'cv') {
-                 if (metrics.cv === null && metrics.budget && metrics.cpa) metrics.cv = metrics.budget / metrics.cpa;
-                 else if (metrics.cv === null && metrics.clicks && metrics.cvr) metrics.cv = metrics.clicks * metrics.cvr;
+                 if (metrics.cv === null && metrics.budget !== null && metrics.cpa !== null) metrics.cv = metrics.budget / metrics.cpa;
+                 else if (metrics.cv === null && metrics.clicks !== null && metrics.cvr !== null) metrics.cv = metrics.clicks * metrics.cvr;
             }
-            if (metrics.budget && metrics.clicks > 0) metrics.cpc = metrics.budget / metrics.clicks;
-            if (metrics.clicks && metrics.imp > 0) metrics.ctr = metrics.clicks / metrics.imp;
-            if (inputs.adMedium === 'Meta' && metrics.budget && metrics.imp > 0) metrics.cpm = (metrics.budget / metrics.imp) * 1000;
+
+            if (inputs.cpc === null && metrics.budget !== null && metrics.clicks > 0) metrics.cpc = metrics.budget / metrics.clicks;
+            if (inputs.ctr === null && metrics.clicks !== null && metrics.imp > 0) metrics.ctr = metrics.clicks / metrics.imp;
+            if (inputs.cpm === null && inputs.adMedium === 'Meta' && metrics.budget !== null && metrics.imp > 0) metrics.cpm = (metrics.budget / metrics.imp) * 1000;
+            
             if (inputs.biddingStrategy === 'cv') {
-                if (metrics.budget && metrics.cv > 0) metrics.cpa = metrics.budget / metrics.cv;
-                if (metrics.cv && metrics.clicks > 0) metrics.cvr = metrics.cv / metrics.clicks;
+                if (inputs.cpa === null && metrics.budget !== null && metrics.cv > 0) metrics.cpa = metrics.budget / metrics.cv;
+                if (inputs.cvr === null && metrics.cv !== null && metrics.clicks > 0) metrics.cvr = metrics.cv / metrics.clicks;
             }
         }
         if (metrics.clicks === null && metrics.imp === null) return { error: '表示回数やクリック数を算出するための情報が不足しています。CPC、CTR、CPM（Metaの場合）のいずれかを入力してください。' };
-        if (metrics.clicks === null && metrics.imp && metrics.ctr !== null) metrics.clicks = metrics.imp * metrics.ctr;
-        if (metrics.imp === null && metrics.clicks && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
+        if (metrics.clicks === null && metrics.imp !== null && metrics.ctr !== null) metrics.clicks = metrics.imp * metrics.ctr;
+        if (metrics.imp === null && metrics.clicks !== null && metrics.ctr > 0) metrics.imp = metrics.clicks / metrics.ctr;
         if (inputs.biddingStrategy === 'cv' && metrics.cv === null) return { error: 'コンバージョン数を算出するための情報が不足しています。CPAまたはCVRを入力してください。' };
         return metrics;
     }
