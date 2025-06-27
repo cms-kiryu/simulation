@@ -29,11 +29,11 @@
         }
         .fade-in { animation: fadeIn 0.5s ease-out forwards; }
         /* テーブルの自動調整用スタイル */
-        #result-container table {
+        #result-container table, #total-result-container table {
             table-layout: fixed;
             width: 100%;
         }
-        #result-container th {
+        #result-container th, #total-result-container th {
             white-space: nowrap; /* 改行を防ぐ */
             overflow: hidden;
             text-overflow: ellipsis;
@@ -41,7 +41,7 @@
             vertical-align: middle; /* 上下中央揃え */
             text-align: center; /* 左右中央揃え */
         }
-        #result-container td {
+        #result-container td, #total-result-container td {
             white-space: nowrap; /* 改行を防ぐ */
             overflow: hidden;
             text-overflow: ellipsis;
@@ -90,6 +90,9 @@
                  <div id="result-container">
                     <!-- 結果はここに動的に生成されます -->
                  </div>
+                 <div id="total-result-container">
+                    <!-- 合計結果はここに動的に生成されます -->
+                 </div>
 
                 <div class="mt-8 text-center">
                      <h3 class="text-lg font-bold text-gray-800 mb-4">エクスポート</h3>
@@ -115,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const simulateBtn = document.getElementById('simulate-btn');
     const resultSection = document.getElementById('result-section');
     const resultContainer = document.getElementById('result-container');
+    const totalResultContainer = document.getElementById('total-result-container');
     const exportFilenameEl = document.getElementById('export-filename');
 
     // --- 初期設定とイベントリスナー ---
@@ -329,9 +333,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- シミュレーション実行 ---
     function runSimulation() {
         resultSection.style.display = 'block';
-        resultContainer.innerHTML = ''; 
+        resultContainer.innerHTML = '';
+        totalResultContainer.innerHTML = ''; 
         
         const mediaBlocks = document.querySelectorAll('.media-block');
+        const allResultsByPattern = {};
+
         mediaBlocks.forEach(mediaBlock => {
             const resultBlock = createResultBlock(mediaBlock);
             resultContainer.appendChild(resultBlock);
@@ -350,15 +357,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let hasError = false;
             const resultBody = resultBlock.querySelector('.result-body');
-            budgetRows.forEach(row => {
+            budgetRows.forEach((row, index) => {
                 if (hasError) return;
                 const budget = parseFloat(row.querySelector('.budget-input').value);
                 if (!budget || isNaN(budget)) return;
 
                 const perfInputs = perfSetting === 'individual' ? getPerfInputs(row) : commonInputs;
                 
-                // 【修正点】表示回数の計算ロジックを修正
-                // 通常のシナリオ（クリック数やCV数に最適）
                 const baseMinInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMax, ctr: perfInputs.ctrMin, cpc: perfInputs.cpcMax, cvr: perfInputs.cvrMin, cpa: perfInputs.cpaMax };
                 const baseMaxInputs = { budget, adMedium: adMediumText, biddingStrategy: mediaBlock.querySelector('.bidding-strategy').value, cpm: perfInputs.cpmMin, ctr: perfInputs.ctrMax, cpc: perfInputs.cpcMin, cvr: perfInputs.cvrMax, cpa: perfInputs.cpaMin };
                 
@@ -371,18 +376,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                // 表示回数に特化したシナリオ (非Meta広告の場合)
                 if (adMediumText !== 'Meta') {
-                    const impMinInputs = { ...baseMinInputs, ctr: perfInputs.ctrMax }; // 表示回数の最小値 = クリック最小 / CTR最大
-                    const impMaxInputs = { ...baseMaxInputs, ctr: perfInputs.ctrMin }; // 表示回数の最大値 = クリック最大 / CTR最小
+                    const impMinInputs = { ...baseMinInputs, ctr: perfInputs.ctrMax };
+                    const impMaxInputs = { ...baseMaxInputs, ctr: perfInputs.ctrMin };
                     const impMinResults = calculateMetrics(impMinInputs);
                     const impMaxResults = calculateMetrics(impMaxInputs);
-                    
-                    // 表示回数の結果のみ差し替える
                     baseMinResults.imp = impMinResults.imp;
                     baseMaxResults.imp = impMaxResults.imp;
                 }
                 
+                if (!allResultsByPattern[index]) {
+                    allResultsByPattern[index] = [];
+                }
+                allResultsByPattern[index].push({
+                    isMeta: adMediumText === 'Meta',
+                    isCvStrategy: mediaBlock.querySelector('.bidding-strategy').value === 'cv',
+                    min: baseMinResults,
+                    max: baseMaxResults
+                });
+
                 appendResultRow(resultBody, baseMinResults, baseMaxResults);
             });
 
@@ -392,6 +404,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 adjustTableLayout(resultBlock.querySelector('.result-table-wrapper'));
             }
         });
+
+        if (mediaBlocks.length > 1) {
+            renderTotalResults(allResultsByPattern);
+        }
     }
     
     // --- 結果ブロックの生成 ---
@@ -439,6 +455,68 @@ document.addEventListener('DOMContentLoaded', () => {
         return resultBlock;
     }
 
+    // --- 合計結果の描画 ---
+    function renderTotalResults(allResultsByPattern) {
+        const dummyMediaBlock = document.createElement('div');
+        dummyMediaBlock.id = 'total-block';
+        const totalResultBlock = createResultBlock(dummyMediaBlock);
+        
+        totalResultBlock.id = 'result-total-block';
+        totalResultBlock.querySelector('h2').textContent = 'シミュレーション結果 合計';
+        totalResultBlock.querySelector('.result-header-info')?.remove();
+        totalResultBlock.querySelector('.target-display-wrapper')?.remove();
+        totalResultBlock.querySelector('.notes-section')?.remove();
+
+        totalResultContainer.appendChild(totalResultBlock);
+        const totalResultBody = totalResultBlock.querySelector('.result-body');
+        
+        let overallHasCv = false;
+
+        for (const patternIndex in allResultsByPattern) {
+            const resultsForPattern = allResultsByPattern[patternIndex];
+            
+            const totals = { min: { budget: 0, imp: 0, clicks: 0, cv: 0 }, max: { budget: 0, imp: 0, clicks: 0, cv: 0 } };
+
+            resultsForPattern.forEach(res => {
+                totals.min.budget += res.min.budget || 0;
+                totals.max.budget += res.max.budget || 0;
+                totals.min.imp += res.min.imp || 0;
+                totals.max.imp += res.max.imp || 0;
+                totals.min.clicks += res.min.clicks || 0;
+                totals.max.clicks += res.max.clicks || 0;
+                totals.min.cv += res.min.cv || 0;
+                totals.max.cv += res.max.cv || 0;
+                if(res.isCvStrategy) overallHasCv = true;
+            });
+
+            // Recalculate rates
+            const finalMin = { budget: totals.min.budget, imp: totals.min.imp, clicks: totals.min.clicks, cv: totals.min.cv };
+            const finalMax = { budget: totals.max.budget, imp: totals.max.imp, clicks: totals.max.clicks, cv: totals.max.cv };
+            
+            finalMin.ctr = finalMin.clicks / finalMin.imp;
+            finalMax.ctr = finalMax.clicks / finalMax.imp;
+            finalMin.cpc = finalMin.budget / finalMin.clicks;
+            finalMax.cpc = finalMax.budget / finalMax.clicks;
+            finalMin.cpm = null;
+            finalMax.cpm = null;
+            finalMin.cvr = finalMin.cv / finalMin.clicks;
+            finalMax.cvr = finalMax.cv / finalMax.clicks;
+            finalMin.cpa = finalMin.budget / finalMin.cv;
+            finalMax.cpa = finalMax.budget / finalMax.cv;
+
+            appendResultRow(totalResultBody, finalMin, finalMax);
+        }
+
+        totalResultBlock.querySelector('.res-header-cpm').style.display = 'none';
+        totalResultBlock.querySelectorAll('.res-cpm-cell').forEach(c => c.style.display = 'none');
+        
+        const cvVisible = overallHasCv ? 'table-cell' : 'none';
+        totalResultBlock.querySelector('.res-header-cv').style.display = cvVisible;
+        totalResultBlock.querySelector('.res-header-cvr').style.display = cvVisible;
+        totalResultBlock.querySelector('.res-header-cpa').style.display = cvVisible;
+        totalResultBlock.querySelectorAll('.res-cv-cell, .res-cvr-cell, .res-cpa-cell').forEach(c => c.style.display = cvVisible);
+    }
+
     // --- 結果行の追加 ---
     function appendResultRow(resultBody, min, max) {
         const row = resultBody.insertRow();
@@ -457,7 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
         row.lastElementChild.classList.remove('border-r');
     }
     
-    // --- 数値取得・整形・計算ロジック (変更なし) ---
+    // --- 数値取得・整形・計算ロジック ---
     function getPerfInputs(container) {
         const getVal = (metric) => {
             const el = container.querySelector(`[data-metric="${metric}"]`);
@@ -478,23 +556,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const formattedValue = Math.round(value).toLocaleString();
         return unit === '¥' ? `${unit}${formattedValue}` : `${formattedValue}${unit}`;
     }
+    // 【修正】パーセンテージのフォーマットロジックを修正
     function formatRangeResult(min, max, unit = '', isPercentage = false) {
         const format = (val) => {
-            if (val === null || typeof val === 'undefined' || isNaN(val)) return '-';
+            if (val === null || typeof val === 'undefined' || isNaN(val) || !isFinite(val)) return '-';
             if (isPercentage) {
-                let percentageValue = val * 100;
-                percentageValue = parseFloat(percentageValue.toPrecision(15));
-                if (percentageValue % 1 === 0) return percentageValue.toFixed(1);
-                return percentageValue.toString();
+                const percentageValue = val * 100;
+                return percentageValue.toFixed(1); // 常に小数点第一位で丸める
             }
             return Math.round(val).toLocaleString();
         };
         const minStr = format(min);
         const maxStr = format(max);
         if (minStr === '-' && maxStr === '-') return '-';
-        if (minStr === maxStr) return unit === '¥' ? `${unit}${minStr}` : `${minStr}${unit}`;
-        if (unit === '¥') return `${unit}${minStr}～${unit}${maxStr}`;
-        return `${minStr}～${maxStr}${unit}`;
+        if (minStr === maxStr) {
+             if (unit === '¥') return `${unit}${minStr}`;
+             return `${minStr}${unit}`;
+        }
+        
+        if (unit === '¥') {
+            return `${unit}${minStr}～${unit}${maxStr}`;
+        } else { // Handles unitless and percentages (suffix)
+            return `${minStr}～${maxStr}${unit}`;
+        }
     }
     function calculateMetrics(inputs) {
         let metrics = { budget: inputs.budget, imp: null, cpm: inputs.cpm, clicks: null, ctr: inputs.ctr, cpc: inputs.cpc, cv: null, cvr: inputs.cvr, cpa: inputs.cpa };
@@ -679,28 +763,35 @@ document.addEventListener('DOMContentLoaded', () => {
         const wb = XLSX.utils.book_new();
 
         document.querySelectorAll('.export-content-area-item').forEach((item, index) => {
-            const adMediumText = item.querySelector('.result-header-info').textContent.replace('広告媒体：', '').trim();
-            const sheetName = `結果${index + 1}_${adMediumText}`.substring(0, 31); // シート名は31文字以内
+            const isTotal = item.id === 'result-total-block';
+            let sheetName;
+            if(isTotal){
+                sheetName = '合計結果';
+            } else {
+                const adMediumText = item.querySelector('.result-header-info').textContent.replace('広告媒体：', '').trim();
+                sheetName = `結果${index + 1}_${adMediumText}`.substring(0, 31);
+            }
+             
             const data = [];
             
             const title = item.querySelector('h2').innerText;
-            const subTitle = item.querySelector('.result-header-info').innerText;
-            data.push([`${title}  ${subTitle}`]);
+            data.push([title]);
+            if (!isTotal) {
+                 const subTitle = item.querySelector('.result-header-info').innerText;
+                 data[0].push(subTitle);
+            }
             data.push([]); 
 
             const targetWrapper = item.querySelector('.target-display-wrapper');
-            if (targetWrapper.style.display !== 'none') {
+            if (targetWrapper && targetWrapper.style.display !== 'none') {
                 data.push(['ターゲット設定:']);
                 const targetItems = [];
                 targetWrapper.querySelectorAll('.target-display span').forEach(span => targetItems.push(span.innerText));
                 data.push(targetItems);
                 data.push([]);
             }
-
-            const table = item.querySelector('table');
-            const ws = XLSX.utils.table_to_sheet(table);
             
-            // スタイル適用のため、手動でデータを再構築
+            const table = item.querySelector('table');
             const aoaData = [];
             const tableHeaders = [];
             const visibleCols = [];
@@ -721,11 +812,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             data.push(...aoaData);
-            data.push([]);
-            data.push(['注釈:']);
-            item.querySelectorAll('.notes-section p').forEach(p => {
-                 if (p.style.display !== 'none') data.push([p.innerText]);
-            });
+
+            const notesSection = item.querySelector('.notes-section');
+            if (notesSection) {
+                data.push([]);
+                data.push(['注釈:']);
+                notesSection.querySelectorAll('p').forEach(p => {
+                    if (p.style.display !== 'none') data.push([p.innerText]);
+                });
+            }
 
             const finalWs = XLSX.utils.aoa_to_sheet(data);
 
