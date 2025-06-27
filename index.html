@@ -378,14 +378,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // "Meta広告以外"の表示回数の計算方法を{クリック数の下限値÷クリック率の上限値}～{クリック数の上限値÷クリック率の下限値}になるように修正
                 if (adMediumText !== 'Meta') {
-                    // 元の計算でimpが算出されている（=CTRの入力がある）場合のみ、新しいロジックで上書きする
-                    if (minResults.imp !== null && maxResults.imp !== null) {
-                        minResults.imp = (maxInputs.ctr && maxInputs.ctr > 0) ? (minResults.clicks / maxInputs.ctr) : null;
-                        maxResults.imp = (minInputs.ctr && minInputs.ctr > 0) ? (maxResults.clicks / minInputs.ctr) : null;
+                    if (minResults.imp !== null && maxResults.imp !== null && maxInputs.ctr > 0 && minInputs.ctr > 0) {
+                        minResults.imp = minResults.clicks / maxInputs.ctr;
+                        maxResults.imp = maxResults.clicks / minInputs.ctr;
                     }
                 }
 
-                // 【修正】手動入力でない場合のみ、率の範囲を再計算
                 if (perfInputs.ctrMin === null) {
                     minResults.ctr = minResults.clicks / maxResults.imp;
                     maxResults.ctr = maxResults.clicks / minResults.imp;
@@ -501,20 +499,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(res.isCvStrategy) overallHasCv = true;
             });
 
-            // Recalculate rates
             const finalMin = { budget: totals.min.budget, imp: totals.min.imp, clicks: totals.min.clicks, cv: totals.min.cv };
             const finalMax = { budget: totals.max.budget, imp: totals.max.imp, clicks: totals.max.clicks, cv: totals.max.cv };
             
+            // Recalculate rates
             finalMin.ctr = finalMin.clicks / finalMax.imp;
             finalMax.ctr = finalMax.clicks / finalMin.imp;
-            finalMin.cpc = finalMin.budget / finalMax.clicks;
-            finalMax.cpc = finalMax.budget / finalMin.clicks;
+            
+            // The appendResultRow function expects max.cpc to be the min value and min.cpc to be the max value for inverse metrics.
+            // The total calculation needs to align with this expectation.
+            // We calculate the actual min/max and assign them to the properties that appendResultRow will swap.
+            finalMax.cpc = finalMin.budget / finalMax.clicks; // MIN cpc (budget / max clicks) -> Assign to max.cpc
+            finalMin.cpc = finalMax.budget / finalMin.clicks; // MAX cpc (budget / min clicks) -> Assign to min.cpc
+
             finalMin.cpm = null;
             finalMax.cpm = null;
+
             finalMin.cvr = finalMin.cv / finalMax.clicks;
             finalMax.cvr = finalMax.cv / finalMin.clicks;
-            finalMin.cpa = finalMin.budget / finalMax.cv;
-            finalMax.cpa = finalMax.budget / finalMin.cv;
+
+            // Same logic as CPC for CPA.
+            finalMax.cpa = finalMin.budget / finalMax.cv; // MIN cpa (budget / max cv) -> Assign to max.cpa
+            finalMin.cpa = finalMax.budget / finalMin.cv; // MAX cpa (budget / min cv) -> Assign to min.cpa
 
             appendResultRow(totalResultBody, finalMin, finalMax);
         }
