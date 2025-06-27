@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web広告シミュレーションツール</title>
+    <!-- Tailwind CSSを読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- エクスポート機能のためのライブラリを読み込み -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -64,6 +66,7 @@
         </header>
 
         <main>
+            <!-- 入力セクション -->
             <div class="max-w-7xl mx-auto">
                  <div class="space-y-6 bg-gray-50 p-6 shadow-sm mb-8">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -116,6 +119,7 @@
                             </div>
                         </div>
                         
+                        <!-- 共通のパフォーマンス指標 -->
                         <div id="common-perf-indicators" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div id="cpm-input-wrapper-common">
                                 <label class="block text-sm font-medium text-gray-700">表示単価</label>
@@ -139,25 +143,30 @@
                             </div>
                         </div>
 
+                        <!-- 予算別の設定エリア -->
                         <div id="budget-container" class="space-y-6">
-                            </div>
+                            <!-- 予算入力欄がここに追加されます -->
+                        </div>
                         <button id="add-budget-btn" class="mt-2 text-sm main-text-color font-semibold hover:underline">+ 予算パターンを追加</button>
                     </div>
                 </div>
             </div>
 
+            <!-- 実行ボタン -->
             <div class="text-center mb-8">
                 <button id="simulate-btn" class="main-bg-color text-white font-bold py-3 px-12 shadow-lg hover:opacity-90 transition-opacity transform hover:scale-105">
                     シミュレーション作成
                 </button>
             </div>
 
+            <!-- 結果表示セクション -->
             <div id="result-section" class="hidden">
                 <hr class="my-8">
+                <!-- VVVVVVVV この内側がエクスポート対象 VVVVVVVV -->
                 <div id="export-content-area" class="pb-8 px-4">
-                    <div class="flex justify-between items-end mb-4">
+                    <div class="flex items-baseline space-x-4 mb-4">
                          <h2 class="text-2xl font-bold main-text-color">シミュレーション結果</h2>
-                         <p id="result-header-info" class="text-gray-600"></p>
+                         <p id="result-header-info" class="text-gray-600 font-bold"></p>
                     </div>
                     <div id="target-display-wrapper" class="mb-6 bg-green-50 main-border-color border p-4 shadow-sm hidden">
                         <h3 class="font-bold text-gray-700 mb-2">ターゲット設定</h3>
@@ -192,11 +201,17 @@
                     </div>
                 </div>
                 
-                <div class="mt-8 text-center space-x-4">
+                <div class="mt-8 text-center">
                      <h3 class="text-lg font-bold text-gray-800 mb-4">エクスポート</h3>
-                    <button id="export-png-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">画像 (PNG)</button>
-                    <button id="export-pdf-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">PDF</button>
-                    <button id="export-excel-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">Excel (XLSX)</button>
+                     <div class="max-w-md mx-auto mb-4">
+                        <label for="export-filename" class="block text-sm font-medium text-gray-700 mb-1">保存ファイル名 (任意)</label>
+                        <input type="text" id="export-filename" class="w-full p-2 border border-gray-300" placeholder="例: A社様向けシミュレーション">
+                     </div>
+                     <div class="space-x-4">
+                        <button id="export-png-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">画像 (PNG)</button>
+                        <button id="export-pdf-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">PDF</button>
+                        <button id="export-excel-btn" class="bg-gray-700 text-white font-bold py-2 px-4 hover:bg-gray-600 transition-colors">Excel (XLSX)</button>
+                     </div>
                 </div>
             </div>
         </main>
@@ -219,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const perfSettingRadios = document.getElementById('perf-setting-radios');
     const commonPerfIndicators = document.getElementById('common-perf-indicators');
     const resultHeaderInfo = document.getElementById('result-header-info');
+    const exportFilenameEl = document.getElementById('export-filename');
 
     // --- 初期設定とイベントリスナー ---
     const init = () => {
@@ -530,29 +546,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- エクスポート関数 ---
+    function getFilename() {
+        const name = exportFilenameEl.value.trim();
+        return name || 'simulation-result';
+    }
+
     function exportAsPng() { 
+        const filename = getFilename();
         html2canvas(document.getElementById('export-content-area'), { scale: 2 }).then(canvas => { 
             const link = document.createElement('a'); 
-            link.download = 'simulation-result.png'; 
+            link.download = `${filename}.png`; 
             link.href = canvas.toDataURL('image/png'); 
             link.click(); 
         }); 
     }
 
     function exportAsPdf() { 
+        const filename = getFilename();
         const { jsPDF } = window.jspdf; 
         html2canvas(document.getElementById('export-content-area'), { scale: 2 }).then(canvas => { 
             const imgData = canvas.toDataURL('image/png'); 
             const pdf = new jsPDF('l', 'mm', 'a4'); 
             const imgProps = pdf.getImageProperties(imgData); 
             const pdfWidth = pdf.internal.pageSize.getWidth(); 
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width; 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight); 
-            pdf.save('simulation-result.pdf'); 
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            const x = (pdfWidth - pdfWidth) / 2; // 中央寄せ
+            const y = (pdf.internal.pageSize.getHeight() - pdfHeight) / 2; // 中央寄せ
+            pdf.addImage(imgData, 'PNG', x, y, pdfWidth, pdfHeight); 
+            pdf.save(`${filename}.pdf`); 
         }); 
     }
 
     function exportAsXlsx() {
+        const filename = getFilename();
         const exportArea = document.getElementById('export-content-area');
         const data = [];
         let tableStartRow = 0;
@@ -619,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ws['!cols'] = colWidths;
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'シミュレーション結果');
-        XLSX.writeFile(wb, 'simulation-result.xlsx');
+        XLSX.writeFile(wb, `${filename}.xlsx`);
     }
 
     // --- 初期化 ---
