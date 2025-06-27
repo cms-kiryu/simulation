@@ -321,6 +321,11 @@ document.addEventListener('DOMContentLoaded', () => {
             resultBlock.querySelector('.res-header-cpm').style.display = isMeta ? 'table-cell' : 'none';
             resultBlock.querySelectorAll('.res-cpm-cell').forEach(c => c.style.display = isMeta ? 'table-cell' : 'none');
             
+            const cpmNote = resultBlock.querySelector('.cpm-note');
+            if (cpmNote) {
+                cpmNote.style.display = isMeta ? 'block' : 'none';
+            }
+
             const cvVisible = isCvStrategy ? 'table-cell' : 'none';
             resultBlock.querySelector('.res-header-cv').style.display = cvVisible;
             resultBlock.querySelector('.res-header-cvr').style.display = cvVisible;
@@ -436,13 +441,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="target-display flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600"></div>
                 </div>
                 <div class="error-message hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 relative mb-6" role="alert"></div>
+                <p class="cpm-note text-xs text-gray-500 text-right mb-1 hidden">※表示単価は1000回表示あたりの金額です。</p>
                 <div class="result-table-wrapper overflow-x-auto border border-gray-200">
                     <table class="min-w-full bg-white">
                         <thead class="main-bg-color text-white">
                             <tr>
                                 <th class="res-header-budget border-r border-green-400">予算</th>
                                 <th class="res-header-imp border-r border-green-400">表示回数</th>
-                                <th class="res-header-cpm border-r border-green-400">表示単価<br><span class="text-xs font-normal">※1000回表示</span></th>
+                                <th class="res-header-cpm border-r border-green-400">表示単価</th>
                                 <th class="res-header-clicks border-r border-green-400">クリック数</th>
                                 <th class="res-header-ctr border-r border-green-400">クリック率</th>
                                 <th class="res-header-cpc border-r border-green-400">クリック単価</th>
@@ -502,29 +508,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const finalMin = { budget: totals.min.budget, imp: totals.min.imp, clicks: totals.min.clicks, cv: totals.min.cv };
             const finalMax = { budget: totals.max.budget, imp: totals.max.imp, clicks: totals.max.clicks, cv: totals.max.cv };
             
-            // Recalculate rates
             finalMin.ctr = finalMin.clicks / finalMax.imp;
             finalMax.ctr = finalMax.clicks / finalMin.imp;
             
-            // The appendResultRow function expects max.cpc to be the min value and min.cpc to be the max value for inverse metrics.
-            // The total calculation needs to align with this expectation.
-            // We calculate the actual min/max and assign them to the properties that appendResultRow will swap.
-            finalMax.cpc = finalMin.budget / finalMax.clicks; // MIN cpc (budget / max clicks) -> Assign to max.cpc
-            finalMin.cpc = finalMax.budget / finalMin.clicks; // MAX cpc (budget / min clicks) -> Assign to min.cpc
+            finalMax.cpc = finalMin.budget / finalMax.clicks; 
+            finalMin.cpc = finalMax.budget / finalMin.clicks; 
 
             finalMin.cpm = null;
             finalMax.cpm = null;
 
             finalMin.cvr = finalMin.cv / finalMax.clicks;
             finalMax.cvr = finalMax.cv / finalMin.clicks;
-
-            // Same logic as CPC for CPA.
-            finalMax.cpa = finalMin.budget / finalMax.cv; // MIN cpa (budget / max cv) -> Assign to max.cpa
-            finalMin.cpa = finalMax.budget / finalMin.cv; // MAX cpa (budget / min cv) -> Assign to min.cpa
+            
+            finalMax.cpa = finalMin.budget / finalMax.cv;
+            finalMin.cpa = finalMax.budget / finalMin.cv;
 
             appendResultRow(totalResultBody, finalMin, finalMax);
         }
 
+        totalResultBlock.querySelector('.cpm-note').style.display = 'none';
         totalResultBlock.querySelector('.res-header-cpm').style.display = 'none';
         totalResultBlock.querySelectorAll('.res-cpm-cell').forEach(c => c.style.display = 'none');
         
