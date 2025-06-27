@@ -376,6 +376,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                // "Meta広告以外"の表示回数の計算方法を{クリック数の下限値÷クリック率の上限値}～{クリック数の上限値÷クリック率の下限値}になるように修正
+                if (adMediumText !== 'Meta') {
+                    // 元の計算でimpが算出されている（=CTRの入力がある）場合のみ、新しいロジックで上書きする
+                    if (minResults.imp !== null && maxResults.imp !== null) {
+                        minResults.imp = (maxInputs.ctr && maxInputs.ctr > 0) ? (minResults.clicks / maxInputs.ctr) : null;
+                        maxResults.imp = (minInputs.ctr && minInputs.ctr > 0) ? (maxResults.clicks / minInputs.ctr) : null;
+                    }
+                }
+
                 // 【修正】手動入力でない場合のみ、率の範囲を再計算
                 if (perfInputs.ctrMin === null) {
                     minResults.ctr = minResults.clicks / maxResults.imp;
